@@ -73,7 +73,7 @@ handle_info({tcp, Sock, TcpData}, StateName, StateData = #state{
 	sock = Sock
 }) ->
 	try 
-		PDU = billy_protocol_piqi:parse_pdu(TcpData),
+		{_PDUType, PDU} = billy_protocol_piqi:parse_pdu(TcpData),
 		gen_fsm:send_event(self(), {in_pdu, PDU}),
 
 		{next_state, StateName, StateData}
@@ -104,9 +104,9 @@ terminate(_Reason, _StateName, _StateData) ->
 
 % % % State NEGOTIATING % % %
 
-st_negotiating({in_pdu, {hello, Hello = #billy_session_hello{
+st_negotiating({in_pdu, Hello = #billy_session_hello{
 	session_id = SessionID
-} }}, StateData = #state{ args = Args }) ->
+} }, StateData = #state{ args = Args }) ->
 	?dispatch_event(cb_on_hello, Args, self(), Hello) ,
 
 	{next_state, unbound, StateData#state{
@@ -177,15 +177,15 @@ st_unbound(Event, _From, StateData) ->
 
 % % % State BINDING % % %
 
-st_binding({in_pdu, {bind_response, 
-				BindResponse = #billy_session_bind_response{ result = accept }}
-			}, StateData = #state{ args = Args }) ->
+st_binding({in_pdu, BindResponse = #billy_session_bind_response{ 
+	result = accept 
+}}, StateData = #state{ args = Args }) ->
 	?dispatch_event(cb_on_bind_accept, Args, self(), BindResponse),
 	{next_state, st_bound, StateData};
 
-st_binding({in_pdu, {bind_response, 
-				BindResponse = #billy_session_bind_response{ result = {reject, _} }}
-			}, StateData = #state{ args = Args }) ->
+st_binding({in_pdu, BindResponse = #billy_session_bind_response{
+	result = {reject, _}
+}}, StateData = #state{ args = Args }) ->
 	?dispatch_event(cb_on_bind_reject, Args, self(), BindResponse),
 	{next_state, st_unbound, StateData};
 
@@ -218,8 +218,8 @@ st_bound({control, unbind, UnbindProps}, StateData = #state{ sock = Sock } ) ->
 	send_pdu(Sock, {unbind_request, UnbindRequest}),
 	{next_state, st_unbinding, StateData};
 
-st_bound({in_pdu, {require_unbind, RequireUnbind = #billy_session_require_unbind{
-}} }, StateData = #state{ args = Args }) ->
+st_bound({in_pdu, RequireUnbind = #billy_session_require_unbind{
+} }, StateData = #state{ args = Args }) ->
 	?dispatch_event(cb_on_required_unbind, Args, self(), RequireUnbind),
 	{next_state, st_required_unbind, StateData};
 
@@ -263,8 +263,8 @@ st_required_unbind(Event, _From, StateData) ->
 
 % % % State UNBINDING % % %
 
-st_unbinding({in_pdu, {unbind_response, UnbindResponse = #billy_session_unbind_response{
-} } }, StateData = #state{ args = Args }) ->
+st_unbinding({in_pdu, UnbindResponse = #billy_session_unbind_response{
+} }, StateData = #state{ args = Args }) ->
 	?dispatch_event(cb_on_unbound, Args, self(), UnbindResponse),
 	{next_state, st_unbound, StateData};
 
