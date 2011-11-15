@@ -8,7 +8,8 @@
 	cb_on_bind_accept :: session_cb(),
 	cb_on_bind_reject :: session_cb(),
 	cb_on_required_unbind :: session_cb(),
-	cb_on_unbound :: session_cb()
+	cb_on_unbound :: session_cb(),
+	cb_on_bye :: session_cb()
 }).
 
 -endif. % billy_session_c_hrl
