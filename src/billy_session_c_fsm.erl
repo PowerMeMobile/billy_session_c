@@ -3,9 +3,7 @@
 
 -behaviour(gen_fsm).
 -export([
-	start_link/2,
-	bind/2,
-	unbind/2
+	start_link/2
 ]).
 
 -export([
@@ -55,7 +53,7 @@ start_link(Sock, Args = #?ARGS{}) ->
 
 init({Sock, Args}) ->
 	gproc:add_local_name({?MODULE, Sock}),
-	
+	io:format("FSM_C:init ~p~n", [self()]),
 	{ok, st_negotiating, #state{
 		sock = Sock,
 		args = Args
@@ -69,16 +67,19 @@ handle_sync_event(Event, _From, _StateName, StateData) ->
 	% {reply, {error, bad_arg}, StateName, StateData}.
 	{stop, {bad_arg, Event}, bad_arg, StateData}.
 
-handle_info({tcp, Sock, TcpData}, StateName, StateData = #state{
+handle_info({tcp, _, TcpData}, StateName, StateData = #state{
 	sock = Sock
 }) ->
 	try 
-		{_PDUType, PDU} = billy_protocol_piqi:parse_pdu(TcpData),
+		io:format("Trying to parse ~p~n", [TcpData]),
+		{_PDUType, PDU} = billy_session_piqi:parse_pdu(TcpData),
+		io:format("Got ~p on ~p~n", [PDU, Sock]),
 		gen_fsm:send_event(self(), {in_pdu, PDU}),
 
 		{next_state, StateName, StateData}
 	catch
-		_EType:_Error ->
+		EType:Error ->
+			io:format("Error parsing data: ~p:~p~n", [EType, Error]),
 			Bye = #billy_session_bye{
 				
 			},
@@ -86,8 +87,8 @@ handle_info({tcp, Sock, TcpData}, StateName, StateData = #state{
 			{stop, normal, StateData}
 	end;
 
-handle_info({tcp_closed, Sock}, _StateName, StateData = #state{
-	sock = Sock
+handle_info({tcp_closed, _}, _StateName, StateData = #state{
+	sock = _Sock
 }) ->
 	{stop, lost_connection, StateData};
 
@@ -109,7 +110,7 @@ st_negotiating({in_pdu, Hello = #billy_session_hello{
 } }, StateData = #state{ args = Args }) ->
 	?dispatch_event(cb_on_hello, Args, self(), Hello) ,
 
-	{next_state, unbound, StateData#state{
+	{next_state, st_unbound, StateData#state{
 		session_id = SessionID
 	}};
 
@@ -154,7 +155,6 @@ st_unbound({control, bye}, StateData = #state{
 		reason = normal
 	},
 	send_pdu(Sock, {bye, Bye}),
-	
 	{stop, normal, StateData};
 
 % got unexpected PDU: saying #bye{ reason = protocol_error }
@@ -290,16 +290,11 @@ st_unbinding(Event, _From, StateData) ->
 %%% Internal
 
 send_pdu(Sock, PDU) ->
+	io:format("Sending PDU:~p into ~p~n", [PDU, Sock]),
 	PDUBin = billy_session_piqi:gen_pdu(PDU),
+	io:format("Sending BIN:~p into ~p~n", [list_to_binary(lists:flatten(PDUBin)), Sock]),
 	gen_tcp:send(Sock, PDUBin),
 	inet:setopts(Sock, [{active, once}]).
 
-%%% API
-
-bind(S, BindProps) ->
-	gen_fsm:send_event(S, {control, bind, BindProps}).
-
-unbind(S, UnbindProps) ->
-	gen_fsm:send_event(S, {control, unbind, UnbindProps}).
 
 
