@@ -8,7 +8,8 @@
 
 	reply_bind/2,
 	reply_unbind/2,
-	reply_bye/2
+	reply_bye/2,
+	reply_data_pdu/2
 ]).
 -export([
 	init/1,
@@ -32,7 +33,8 @@ behaviour_info(callbacks) ->
 		{handle_bind_reject, 3},
 		{handle_require_unbind, 3},
 		{handle_unbind_response, 3},
-		{handle_bye, 3}
+		{handle_bye, 3},
+		{handle_data_pdu, 3}
 	].
 
 -include("billy_session_c.hrl").
@@ -58,7 +60,8 @@ init({Sock, Mod, ModArgs}) ->
 		cb_on_bind_reject = fun(_Pid, PDU) -> gen_server:cast(Gen, {Ref, on_bind_reject, PDU}) end,
 		cb_on_required_unbind = fun(_Pid, PDU) -> gen_server:cast(Gen, {Ref, on_require_unbind, PDU}) end,
 		cb_on_unbound = fun(_Pid, PDU) -> gen_server:cast(Gen, {Ref, on_unbound, PDU}) end,
-		cb_on_bye = fun(_Pid, PDU) -> gen_server:cast(Gen, {Ref, on_bye, PDU}) end
+		cb_on_bye = fun(_Pid, PDU) -> gen_server:cast(Gen, {Ref, on_bye, PDU}) end,
+		cb_on_data_pdu = fun(_Pid, PDU) -> gen_server:cast(Gen, {Ref, on_data_pdu, PDU}) end
 	}),
 
 	{ok, ModState} = Mod:init(ModArgs, FSM),
@@ -134,9 +137,8 @@ handle_cast({Ref, on_bye, InPDU}, State = #state{ ref = Ref, fsm = FSM, mod = Mo
 		mod_state = NModState
 	}};
 
-
-handle_cast({Ref, on_bye, InPDU}, State = #state{ ref = Ref, fsm = FSM, mod = Mod, mod_state = ModState }) ->
-	{noreply, NModState} = Mod:handle_bye(InPDU, FSM, ModState),
+handle_cast({Ref, on_data_pdu, InPDU}, State = #state{ ref = Ref, fsm = FSM, mod = Mod, mod_state = ModState }) ->
+	{noreply, NModState} = Mod:handle_data_pdu(InPDU, FSM, ModState),
 	{noreply, State#state{
 		mod_state = NModState
 	}};
@@ -182,4 +184,6 @@ reply_unbind(Session, Props) ->
 	{ok, FSM} = gen_server:call(Session, get_fsm, infinity),
 	gen_fsm:send_event(FSM, {control, unbind, Props}).
 
-
+reply_data_pdu(Session, Props) ->
+	{ok, FSM} = gen_server:call(Session, get_fsm, infinity),
+	gen_fsm:send_event(FSM, {control, data_pdu, Props}).

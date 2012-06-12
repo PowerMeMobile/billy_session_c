@@ -45,7 +45,10 @@
 -record(state, {
 	session_id :: binary(),
 	sock,
-	args :: #billy_session_c_args{}
+	args :: #billy_session_c_args{},
+	unbound_request,
+	bound_request,
+	tcp_bytes_part :: binary()
 }).
 
 start_link(Sock, Args = #?ARGS{}) ->
@@ -56,32 +59,51 @@ init({Sock, Args}) ->
 	io:format("FSM_C:init ~p~n", [self()]),
 	{ok, st_negotiating, #state{
 		sock = Sock,
-		args = Args
+		args = Args,
+		unbound_request = undefined,
+		tcp_bytes_part = <<>>
 	}}.
 
 handle_event(Event, _StateName, StateData) ->
 	% {next_state, StateName, StateData}.
 	{stop, {bad_arg, Event}, StateData}.
 
+handle_sync_event(wait_till_st_bound, From, StateName, StateData) ->
+	% io:format("wait_till_st_bound, StateName: ~p~n", [StateName]),
+	case StateName of
+		st_bound ->
+			{reply,{ok, bound},StateName,StateData};
+		_Any ->
+			{next_state,StateName,StateData#state{bound_request = From}}
+	end;
+handle_sync_event(wait_till_st_unbound, From, StateName, StateData) ->
+	% io:format("wait_till_st_unbound, StateName: ~p~n", [StateName]),
+	case StateName of
+		st_unbound ->
+			{reply,{ok, unbound},StateName,StateData};
+		_Any ->
+			{next_state,StateName,StateData#state{unbound_request = From}}
+	end;
 handle_sync_event(Event, _From, _StateName, StateData) ->
 	% {reply, {error, bad_arg}, StateName, StateData}.
 	{stop, {bad_arg, Event}, bad_arg, StateData}.
 
 handle_info({tcp, _, TcpData}, StateName, StateData = #state{
-	sock = Sock
+	sock = Sock, tcp_bytes_part = BytesPart
 }) ->
 	try 
-		io:format("Trying to parse ~p~n", [TcpData]),
-		{_PDUType, PDU} = billy_session_piqi:parse_pdu(TcpData),
-		io:format("Got ~p on ~p~n", [PDU, Sock]),
-		gen_fsm:send_event(self(), {in_pdu, PDU}),
-
-		{next_state, StateName, StateData}
+		% io:format("Data for parsing: ~p~n", [list_to_binary([BytesPart, TcpData])]),
+		{ok, NewBytesPart} = parse_tcp_data(list_to_binary([BytesPart, TcpData])),
+		% io:format("NewBytesPart: ~p~n", [NewBytesPart]),
+		inet:setopts(Sock, [{active, once}]),				
+		{next_state, StateName, StateData#state{tcp_bytes_part = NewBytesPart}}
 	catch
 		EType:Error ->
 			io:format("Error parsing data: ~p:~p~n", [EType, Error]),
 			Bye = #billy_session_bye{
-				
+					state_name = StateName,
+					reason = internal_error,
+					reason_long = list_to_binary(io_lib:format("~p : ~p", [EType, Error]))
 			},
 			send_pdu(Sock, {bye, Bye}),
 			{stop, normal, StateData}
@@ -107,9 +129,14 @@ terminate(_Reason, _StateName, _StateData) ->
 
 st_negotiating({in_pdu, Hello = #billy_session_hello{
 	session_id = SessionID
-} }, StateData = #state{ args = Args }) ->
+} }, StateData = #state{ args = Args, unbound_request = Caller }) ->
 	?dispatch_event(cb_on_hello, Args, self(), Hello) ,
-
+	case Caller of
+		undefined ->
+			ok;
+		From ->
+			gen_fsm:reply(From, {ok, unbound})
+	end,
 	{next_state, st_unbound, StateData#state{
 		session_id = SessionID
 	}};
@@ -179,8 +206,15 @@ st_unbound(Event, _From, StateData) ->
 
 st_binding({in_pdu, BindResponse = #billy_session_bind_response{ 
 	result = accept 
-}}, StateData = #state{ args = Args }) ->
+}}, StateData = #state{ args = Args, bound_request = Caller }) ->
+	% io:format("in_pdu, BindResponse", []),
 	?dispatch_event(cb_on_bind_accept, Args, self(), BindResponse),
+	case Caller of
+		undefined ->
+			ok;
+		From ->
+			gen_fsm:reply(From, {ok, bound})
+	end,
 	{next_state, st_bound, StateData};
 
 st_binding({in_pdu, BindResponse = #billy_session_bind_response{
@@ -210,6 +244,16 @@ st_binding(Event, _From, StateData) ->
 
 
 % % % State BOUND % % %
+st_bound({control, data_pdu, DataPDUBin}, StateData = #state{ sock = Sock }) ->
+	DataPDU = #billy_session_data_pdu{
+		data_pdu = DataPDUBin
+	},
+	send_pdu(Sock, {data_pdu, DataPDU}),
+	{next_state, st_bound, StateData};
+
+st_bound({in_pdu, DataPDU = #billy_session_data_pdu{} },  StateData = #state{ args = Args }) ->
+	?dispatch_event(cb_on_data_pdu, Args, self(), DataPDU),
+	{next_state, st_bound, StateData};
 
 st_bound({control, unbind, UnbindProps}, StateData = #state{ sock = Sock } ) ->
 	UnbindRequest = #billy_session_unbind_request{
@@ -290,11 +334,28 @@ st_unbinding(Event, _From, StateData) ->
 %%% Internal
 
 send_pdu(Sock, PDU) ->
-	io:format("Sending PDU:~p into ~p~n", [PDU, Sock]),
+	% io:format("Sending PDU:~p into ~p~n", [PDU, Sock]),
 	PDUBin = billy_session_piqi:gen_pdu(PDU),
-	io:format("Sending BIN:~p into ~p~n", [list_to_binary(lists:flatten(PDUBin)), Sock]),
-	gen_tcp:send(Sock, PDUBin),
+	Size = size(list_to_binary(PDUBin)),
+	BinSize = <<Size:16/little>>,
+	% io:format("BinSize: ~p~n", [BinSize]),
+	Bin = list_to_binary([BinSize, PDUBin]),
+	% io:format("Sending BIN: ~p~n", [Bin]),
+	gen_tcp:send(Sock, Bin),
 	inet:setopts(Sock, [{active, once}]).
 
-
-
+parse_tcp_data(Bytes) when size(Bytes) =< 2 ->
+	{ok, Bytes};
+parse_tcp_data(<<BinSize:2/binary, BytesSoFar/binary>>) ->
+	Size = binary:decode_unsigned(BinSize, little),
+	BytesSoFarSize = size(BytesSoFar),
+	if
+		BytesSoFarSize >= Size ->	
+			<<PDUBin:Size/binary, PDUBinSoFar/binary>> = BytesSoFar,
+			{_PDUType, PDU} = billy_session_piqi:parse_pdu(PDUBin),
+			%io:format("Got ~p on ~p~n", [PDU, Sock]),
+			gen_fsm:send_event(self(), {in_pdu, PDU}),
+			parse_tcp_data(PDUBinSoFar);
+		true ->
+			{ok, list_to_binary([BinSize, BytesSoFar])}
+	end.
