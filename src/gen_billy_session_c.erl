@@ -2,6 +2,7 @@
 
 -behaviour(gen_server).
 
+%% API
 -export([
 	start_link/3,
 	pass_socket_control/2,
@@ -11,6 +12,8 @@
 	reply_bye/2,
 	reply_data_pdu/2
 ]).
+
+%% gen_server callbacks
 -export([
 	init/1,
 	handle_call/3,
@@ -19,14 +22,15 @@
 	terminate/2,
 	code_change/3
 ]).
+
 -export([
 	behaviour_info/1
 ]).
 behaviour_info(callbacks) ->
 	[
 		{init, 2},
-		{handle_call,4},
-		{handle_cast,3},
+		{handle_call, 4},
+		{handle_cast, 3},
 
 		{handle_hello, 3},
 		{handle_bind_accept, 3},
@@ -35,7 +39,7 @@ behaviour_info(callbacks) ->
 		{handle_unbind_response, 3},
 		{handle_bye, 3},
 		{handle_data_pdu, 3}
-	].
+].
 
 -include("billy_session_c.hrl").
 
@@ -47,8 +51,38 @@ behaviour_info(callbacks) ->
 	fsm :: pid()
 }).
 
+%% ===================================================================
+%% API
+%% ===================================================================
+
 start_link(Sock, Mod, ModArgs) ->
 	gen_server:start_link(?MODULE, {Sock, Mod, ModArgs}, []).
+
+pass_socket_control(Session, Socket) ->
+	{ok, FSM} = gen_server:call(Session, get_fsm, infinity),
+	io:format("passing control over ~p to ~p~n", [Socket, FSM]),
+	ok = gen_tcp:controlling_process(Socket, FSM),
+	inet:setopts(Socket, [{active, once}]).
+
+reply_bye(Session, Props) ->
+	{ok, FSM} = gen_server:call(Session, get_fsm, infinity),
+	gen_fsm:send_event(FSM, {control, bye, Props}).
+
+reply_bind(Session, Props) ->
+	{ok, FSM} = gen_server:call(Session, get_fsm, infinity),
+	gen_fsm:send_event(FSM, {control, bind, Props}).
+
+reply_unbind(Session, Props) ->
+	{ok, FSM} = gen_server:call(Session, get_fsm, infinity),
+	gen_fsm:send_event(FSM, {control, unbind, Props}).
+
+reply_data_pdu(Session, Props) ->
+	{ok, FSM} = gen_server:call(Session, get_fsm, infinity),
+	gen_fsm:send_event(FSM, {control, data_pdu, Props}).
+
+%% ===================================================================
+%% gen_server callbacks
+%% ===================================================================
 
 init({Sock, Mod, ModArgs}) ->
 	Gen = self(),
@@ -75,83 +109,79 @@ init({Sock, Mod, ModArgs}) ->
 		fsm = FSM
 	}}.
 
-handle_call(get_fsm, _From, State = #state{ fsm = FSM }) ->
+handle_call(get_fsm, _From, State = #state{fsm = FSM}) ->
 	{reply, {ok, FSM}, State};
 
-handle_call(Request, From, State = #state{ mod = Mod, fsm = FSM, mod_state = ModState }) ->
-	%{stop, {bad_arg, Request}, State}.
+handle_call(Request, From, State = #state{mod = Mod, fsm = FSM, mod_state = ModState}) ->
 	case Mod:handle_call(Request, From, FSM, ModState) of
-		{reply,Reply,NewMState} ->
-			{reply, Reply, State#state{ mod_state = NewMState }};
-		{reply,Reply,NewMState,Timeout} ->
-			{reply, Reply, State#state{ mod_state = NewMState }, Timeout};
-		{noreply,NewMState} ->
-			{noreply, State#state{ mod_state = NewMState }};
-		{noreply,NewMState,Timeout} ->
-			{noreply, State#state{ mod_state = NewMState }, Timeout};
-		{stop,Reason,Reply,NewMState} ->
-			{stop, Reason, Reply, State#state{ mod_state = NewMState }};
-		{stop,Reason,NewMState} ->
-			{stop, Reason, State#state{ mod_state = NewMState }}
+		{reply, Reply, NewMState} ->
+			{reply, Reply, State#state{mod_state = NewMState}};
+		{reply, Reply, NewMState, Timeout} ->
+			{reply, Reply, State#state{mod_state = NewMState}, Timeout};
+		{noreply, NewMState} ->
+			{noreply, State#state{mod_state = NewMState}};
+		{noreply, NewMState, Timeout} ->
+			{noreply, State#state{mod_state = NewMState}, Timeout};
+		{stop, Reason, Reply, NewMState} ->
+			{stop, Reason, Reply, State#state{mod_state = NewMState}};
+		{stop, Reason, NewMState} ->
+			{stop, Reason, State#state{mod_state = NewMState}}
 	end.
 
-
-handle_cast({control, bind_request, _Props}, State = #state{ fsm = _FSM }) ->
-	
+handle_cast({control, bind_request, _Props}, State = #state{fsm = _FSM}) ->
 	{noreply, State};
 
-handle_cast({Ref, on_hello, InPDU}, State = #state{ ref = Ref, fsm = FSM, mod = Mod, mod_state = ModState }) ->
+handle_cast({Ref, on_hello, InPDU}, State = #state{ref = Ref, fsm = FSM, mod = Mod, mod_state = ModState}) ->
 	io:format("Got #Hello~n", []),
 	{noreply, NModState} = Mod:handle_hello(InPDU, FSM, ModState),
 	{noreply, State#state{
 		mod_state = NModState
 	}};
 
-handle_cast({Ref, on_bind_accept, InPDU}, State = #state{ ref = Ref, fsm = FSM, mod = Mod, mod_state = ModState }) ->
+handle_cast({Ref, on_bind_accept, InPDU}, State = #state{ref = Ref, fsm = FSM, mod = Mod, mod_state = ModState}) ->
 	{noreply, NModState} = Mod:handle_bind_accept(InPDU, FSM, ModState),
 	{noreply, State#state{
 		mod_state = NModState
 	}};
 
-handle_cast({Ref, on_bind_reject, InPDU}, State = #state{ ref = Ref, fsm = FSM, mod = Mod, mod_state = ModState }) ->
+handle_cast({Ref, on_bind_reject, InPDU}, State = #state{ref = Ref, fsm = FSM, mod = Mod, mod_state = ModState}) ->
 	{noreply, NModState} = Mod:handle_bind_reject(InPDU, FSM, ModState),
 	{noreply, State#state{
 		mod_state = NModState
 	}};
 
-handle_cast({Ref, on_require_unbind, InPDU}, State = #state{ ref = Ref, fsm = FSM, mod = Mod, mod_state = ModState }) ->
+handle_cast({Ref, on_require_unbind, InPDU}, State = #state{ref = Ref, fsm = FSM, mod = Mod, mod_state = ModState}) ->
 	{noreply, NModState} = Mod:handle_require_unbind(InPDU, FSM, ModState),
 	{noreply, State#state{
 		mod_state = NModState
 	}};
 
-handle_cast({Ref, on_unbound, InPDU}, State = #state{ ref = Ref, fsm = FSM, mod = Mod, mod_state = ModState }) ->
+handle_cast({Ref, on_unbound, InPDU}, State = #state{ref = Ref, fsm = FSM, mod = Mod, mod_state = ModState}) ->
 	{noreply, NModState} = Mod:handle_unbind_response(InPDU, FSM, ModState),
 	{noreply, State#state{
 		mod_state = NModState
 	}};
 
-handle_cast({Ref, on_bye, InPDU}, State = #state{ ref = Ref, fsm = FSM, mod = Mod, mod_state = ModState }) ->
+handle_cast({Ref, on_bye, InPDU}, State = #state{ref = Ref, fsm = FSM, mod = Mod, mod_state = ModState}) ->
 	{noreply, NModState} = Mod:handle_bye(InPDU, FSM, ModState),
 	{noreply, State#state{
 		mod_state = NModState
 	}};
 
-handle_cast({Ref, on_data_pdu, InPDU}, State = #state{ ref = Ref, fsm = FSM, mod = Mod, mod_state = ModState }) ->
+handle_cast({Ref, on_data_pdu, InPDU}, State = #state{ref = Ref, fsm = FSM, mod = Mod, mod_state = ModState}) ->
 	{noreply, NModState} = Mod:handle_data_pdu(InPDU, FSM, ModState),
 	{noreply, State#state{
 		mod_state = NModState
 	}};
 
-handle_cast(Request, State = #state{ fsm = FSM, mod_state = ModState, mod = Mod }) ->
-	%{stop, {bad_arg, Request}, State}.
+handle_cast(Request, State = #state{fsm = FSM, mod_state = ModState, mod = Mod}) ->
 	case Mod:handle_cast(Request, FSM, ModState) of
-		{noreply,NewMState} ->
-			{noreply, State#state{ mod_state = NewMState }};
-		{noreply,NewMState,Timeout} ->
-			{noreply, State#state{ mod_state = NewMState }, Timeout};
-		{stop,Reason,NewMState} ->
-			{stop, Reason, State#state{ mod_state = NewMState }}
+		{noreply, NewMState} ->
+			{noreply, State#state{mod_state = NewMState}};
+		{noreply, NewMState, Timeout} ->
+			{noreply, State#state{mod_state = NewMState}, Timeout};
+		{stop, Reason, NewMState} ->
+			{stop, Reason, State#state{mod_state = NewMState}}
 	end.
 
 handle_info(Message, State = #state{}) ->
@@ -162,28 +192,3 @@ terminate(_Reason, _State) ->
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
-
-
-%%% API %%%
-
-pass_socket_control(Session, Socket) ->
-	{ok, FSM} = gen_server:call(Session, get_fsm, infinity),
-	io:format("passing control over ~p to ~p~n", [Socket, FSM]),
-	ok = gen_tcp:controlling_process(Socket, FSM),
-	inet:setopts(Socket, [{active, once}]).
-
-reply_bye(Session, Props) ->
-	{ok, FSM} = gen_server:call(Session, get_fsm, infinity),
-	gen_fsm:send_event(FSM, {control, bye, Props}).
-
-reply_bind(Session, Props) ->
-	{ok, FSM} = gen_server:call(Session, get_fsm, infinity),
-	gen_fsm:send_event(FSM, {control, bind, Props}).
-
-reply_unbind(Session, Props) ->
-	{ok, FSM} = gen_server:call(Session, get_fsm, infinity),
-	gen_fsm:send_event(FSM, {control, unbind, Props}).
-
-reply_data_pdu(Session, Props) ->
-	{ok, FSM} = gen_server:call(Session, get_fsm, infinity),
-	gen_fsm:send_event(FSM, {control, data_pdu, Props}).
