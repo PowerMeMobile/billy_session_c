@@ -132,42 +132,49 @@ handle_cast({control, bind_request, _Props}, State = #state{fsm = _FSM}) ->
 	{noreply, State};
 
 handle_cast({Ref, on_hello, InPDU}, State = #state{ref = Ref, fsm = FSM, mod = Mod, mod_state = ModState}) ->
+	et:trace_me(85, server, client, hello, InPDU),
 	{noreply, NModState} = Mod:handle_hello(InPDU, FSM, ModState),
 	{noreply, State#state{
 		mod_state = NModState
 	}};
 
 handle_cast({Ref, on_bind_accept, InPDU}, State = #state{ref = Ref, fsm = FSM, mod = Mod, mod_state = ModState}) ->
+	et:trace_me(85, server, client, bind_accept, InPDU),
 	{noreply, NModState} = Mod:handle_bind_accept(InPDU, FSM, ModState),
 	{noreply, State#state{
 		mod_state = NModState
 	}};
 
 handle_cast({Ref, on_bind_reject, InPDU}, State = #state{ref = Ref, fsm = FSM, mod = Mod, mod_state = ModState}) ->
+	et:trace_me(85, server, client, bind_reject, InPDU),
 	{noreply, NModState} = Mod:handle_bind_reject(InPDU, FSM, ModState),
 	{noreply, State#state{
 		mod_state = NModState
 	}};
 
 handle_cast({Ref, on_require_unbind, InPDU}, State = #state{ref = Ref, fsm = FSM, mod = Mod, mod_state = ModState}) ->
+	et:trace_me(85, server, client, require_unbind, InPDU),
 	{noreply, NModState} = Mod:handle_require_unbind(InPDU, FSM, ModState),
 	{noreply, State#state{
 		mod_state = NModState
 	}};
 
 handle_cast({Ref, on_unbound, InPDU}, State = #state{ref = Ref, fsm = FSM, mod = Mod, mod_state = ModState}) ->
+	et:trace_me(85, server, client, unbound, InPDU),
 	{noreply, NModState} = Mod:handle_unbind_response(InPDU, FSM, ModState),
 	{noreply, State#state{
 		mod_state = NModState
 	}};
 
 handle_cast({Ref, on_bye, InPDU}, State = #state{ref = Ref, fsm = FSM, mod = Mod, mod_state = ModState}) ->
+	et:trace_me(85, server, client, bye, InPDU),
 	{noreply, NModState} = Mod:handle_bye(InPDU, FSM, ModState),
 	{noreply, State#state{
 		mod_state = NModState
 	}};
 
 handle_cast({Ref, on_data_pdu, InPDU}, State = #state{ref = Ref, fsm = FSM, mod = Mod, mod_state = ModState}) ->
+	et:trace_me(85, server, client, data_pdu, InPDU),
 	{noreply, NModState} = Mod:handle_data_pdu(InPDU, FSM, ModState),
 	{noreply, State#state{
 		mod_state = NModState

@@ -339,6 +339,7 @@ st_unbinding(Event, _From, StateData) ->
 
 send_pdu(Sock, Msg, Data) ->
 	PDU = {Msg, Data},
+	et:trace_me(85, client, server, Msg, PDU),
 	send_pdu(Sock, PDU).
 
 send_pdu(Sock, PDU) ->
