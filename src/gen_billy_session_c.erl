@@ -132,7 +132,6 @@ handle_cast({control, bind_request, _Props}, State = #state{fsm = _FSM}) ->
 	{noreply, State};
 
 handle_cast({Ref, on_hello, InPDU}, State = #state{ref = Ref, fsm = FSM, mod = Mod, mod_state = ModState}) ->
-	io:format("Got #Hello~n", []),
 	{noreply, NModState} = Mod:handle_hello(InPDU, FSM, ModState),
 	{noreply, State#state{
 		mod_state = NModState

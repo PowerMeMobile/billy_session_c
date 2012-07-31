@@ -78,7 +78,6 @@ init({Sock, Args}) ->
 	}}.
 
 handle_event(Event, _StateName, StateData) ->
-	% {next_state, StateName, StateData}.
 	{stop, {bad_arg, Event}, StateData}.
 
 handle_sync_event(wait_till_st_bound, From, StateName, StateData) ->
@@ -98,7 +97,6 @@ handle_sync_event(wait_till_st_unbound, From, StateName, StateData) ->
 			{next_state, StateName, StateData#state{unbound_request = From}}
 	end;
 handle_sync_event(Event, _From, _StateName, StateData) ->
-	% {reply, {error, bad_arg}, StateName, StateData}.
 	{stop, {bad_arg, Event}, bad_arg, StateData}.
 
 handle_info({tcp, _, TcpData}, StateName, StateData = #state{
@@ -118,7 +116,7 @@ handle_info({tcp, _, TcpData}, StateName, StateData = #state{
 				reason = internal_error,
 				reason_long = list_to_binary(io_lib:format("~p : ~p", [EType, Error]))
 			},
-			send_pdu(Sock, {bye, Bye}),
+			send_pdu(Sock, bye, Bye),
 			{stop, normal, StateData}
 	end;
 
@@ -128,7 +126,6 @@ handle_info({tcp_closed, _}, _StateName, StateData = #state{
 	{stop, lost_connection, StateData};
 
 handle_info(Info, _StateName, StateData) ->
-	%{next_state, StateName, StateData}.
 	{stop, {bad_arg, Info}, StateData}.
 
 code_change(_OldVsn, StateName, StateData, _Extra) ->
@@ -161,15 +158,13 @@ st_negotiating({in_pdu, _WrongPDU}, StateData = #state{sock = Sock}) ->
 		state_name = st_negotiating,
 		reason = protocol_error
 	},
-	send_pdu(Sock, {bye, Bye}),
+	send_pdu(Sock, bye, Bye),
 	{stop, protocol_error, StateData};
 
 st_negotiating(Event, StateData) ->
-	%{next_state, st_free, StateData}.
 	{stop, {bad_arg, Event}, StateData}.
 
 st_negotiating(Event, _From, StateData) ->
-	%{reply, {error, bad_arg}, StateName, StateData}.
 	{stop, {bad_arg, Event}, {error, bad_arg}, StateData}.
 
 %% ===================================================================
@@ -184,7 +179,7 @@ st_unbound({control, bind, BindProps}, StateData = #state{sock = Sock}) ->
 		client_id = ClientID,
 		client_pw = ClientPw
 	},
-	send_pdu(Sock, {bind_request, BindReq}),
+	send_pdu(Sock, bind_request, BindReq),
 	{next_state, st_binding, StateData};
 
 % API asked to say #bye
@@ -195,7 +190,7 @@ st_unbound({control, bye}, StateData = #state{
 		state_name = st_unbound,
 		reason = normal
 	},
-	send_pdu(Sock, {bye, Bye}),
+	send_pdu(Sock, bye, Bye),
 	{stop, normal, StateData};
 
 % got unexpected PDU: saying #bye{reason = protocol_error}
@@ -204,15 +199,13 @@ st_unbound({in_pdu, _WrongPDU}, StateData = #state{sock = Sock}) ->
 		state_name = st_negotiating,
 		reason = protocol_error
 	},
-	send_pdu(Sock, {bye, Bye}),
+	send_pdu(Sock, bye, Bye),
 	{stop, protocol_error, StateData};
 
 st_unbound(Event, StateData) ->
-	%{next_state, st_free, StateData}.
 	{stop, {bad_arg, Event}, StateData}.
 
 st_unbound(Event, _From, StateData) ->
-	%{reply, {error, bad_arg}, StateName, StateData}.
 	{stop, {bad_arg, Event}, {error, bad_arg}, StateData}.
 
 %% ===================================================================
@@ -244,15 +237,13 @@ st_binding({in_pdu, _WrongPDU}, StateData = #state{sock = Sock}) ->
 		state_name = st_negotiating,
 		reason = protocol_error
 	},
-	send_pdu(Sock, {bye, Bye}),
+	send_pdu(Sock, bye, Bye),
 	{stop, protocol_error, StateData};
 
 st_binding(Event, StateData) ->
-	%{next_state, st_free, StateData}.
 	{stop, {bad_arg, Event}, StateData}.
 
 st_binding(Event, _From, StateData) ->
-	%{reply, {error, bad_arg}, StateName, StateData}.
 	{stop, {bad_arg, Event}, {error, bad_arg}, StateData}.
 
 %% ===================================================================
@@ -263,7 +254,7 @@ st_bound({control, data_pdu, DataPDUBin}, StateData = #state{sock = Sock}) ->
 	DataPDU = #billy_session_data_pdu{
 		data_pdu = DataPDUBin
 	},
-	send_pdu(Sock, {data_pdu, DataPDU}),
+	send_pdu(Sock, data_pdu, DataPDU),
 	{next_state, st_bound, StateData};
 
 st_bound({in_pdu, DataPDU = #billy_session_data_pdu{}},  StateData = #state{args = Args}) ->
@@ -274,7 +265,7 @@ st_bound({control, unbind, UnbindProps}, StateData = #state{sock = Sock}) ->
 	UnbindRequest = #billy_session_unbind_request{
 		reason = proplists:get_value(reason, UnbindProps)
 	},
-	send_pdu(Sock, {unbind_request, UnbindRequest}),
+	send_pdu(Sock, unbind_request, UnbindRequest),
 	{next_state, st_unbinding, StateData};
 
 st_bound({in_pdu, RequireUnbind = #billy_session_require_unbind{}}, StateData = #state{
@@ -289,15 +280,13 @@ st_bound({in_pdu, _WrongPDU}, StateData = #state{sock = Sock}) ->
 		state_name = st_negotiating,
 		reason = protocol_error
 	},
-	send_pdu(Sock, {bye, Bye}),
+	send_pdu(Sock, bye, Bye),
 	{stop, protocol_error, StateData};
 
 st_bound(Event, StateData) ->
-	%{next_state, st_free, StateData}.
 	{stop, {bad_arg, Event}, StateData}.
 
 st_bound(Event, _From, StateData) ->
-	%{reply, {error, bad_arg}, StateName, StateData}.
 	{stop, {bad_arg, Event}, {error, bad_arg}, StateData}.
 
 %% ===================================================================
@@ -310,15 +299,13 @@ st_required_unbind({in_pdu, _WrongPDU}, StateData = #state{sock = Sock}) ->
 		state_name = st_negotiating,
 		reason = protocol_error
 	},
-	send_pdu(Sock, {bye, Bye}),
+	send_pdu(Sock, bye, Bye),
 	{stop, protocol_error, StateData};
 
 st_required_unbind(Event, StateData) ->
-	%{next_state, st_free, StateData}.
 	{stop, {bad_arg, Event}, StateData}.
 
 st_required_unbind(Event, _From, StateData) ->
-	%{reply, {error, bad_arg}, StateName, StateData}.
 	{stop, {bad_arg, Event}, {error, bad_arg}, StateData}.
 
 %% ===================================================================
@@ -337,20 +324,22 @@ st_unbinding({in_pdu, _WrongPDU}, StateData = #state{sock = Sock}) ->
 		state_name = st_negotiating,
 		reason = protocol_error
 	},
-	send_pdu(Sock, {bye, Bye}),
+	send_pdu(Sock, bye, Bye),
 	{stop, protocol_error, StateData};
 
 st_unbinding(Event, StateData) ->
-	%{next_state, st_free, StateData}.
 	{stop, {bad_arg, Event}, StateData}.
 
 st_unbinding(Event, _From, StateData) ->
-	%{reply, {error, bad_arg}, StateName, StateData}.
 	{stop, {bad_arg, Event}, {error, bad_arg}, StateData}.
 
 %% ===================================================================
 %% Internal
 %% ===================================================================
+
+send_pdu(Sock, Msg, Data) ->
+	PDU = {Msg, Data},
+	send_pdu(Sock, PDU).
 
 send_pdu(Sock, PDU) ->
 	% io:format("Sending PDU:~p into ~p~n", [PDU, Sock]),
