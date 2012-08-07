@@ -36,6 +36,7 @@
 ]).
 
 -include("billy_session_c.hrl").
+-include_lib("billy_common/include/logging.hrl").
 -include_lib("billy_common/include/billy_session_piqi.hrl").
 -include_lib("billy_common/include/gen_fsm_spec.hrl").
 
@@ -68,7 +69,7 @@ start_link(Sock, Args = #?ARGS{}) ->
 
 init({Sock, Args}) ->
 	gproc:add_local_name({?MODULE, Sock}),
-	io:format("FSM_C:init ~p~n", [self()]),
+	?log_debug("FSM_C:init ~p", [self()]),
 
 	{ok, st_negotiating, #state{
 		sock = Sock,
@@ -81,7 +82,7 @@ handle_event(Event, _StateName, StateData) ->
 	{stop, {bad_arg, Event}, StateData}.
 
 handle_sync_event(wait_till_st_bound, From, StateName, StateData) ->
-	% io:format("wait_till_st_bound, StateName: ~p~n", [StateName]),
+	%?log_debug("wait_till_st_bound, StateName: ~p", [StateName]),
 	case StateName of
 		st_bound ->
 			{reply, {ok, bound}, StateName, StateData};
@@ -89,7 +90,7 @@ handle_sync_event(wait_till_st_bound, From, StateName, StateData) ->
 			{next_state, StateName, StateData#state{bound_request = From}}
 	end;
 handle_sync_event(wait_till_st_unbound, From, StateName, StateData) ->
-	% io:format("wait_till_st_unbound, StateName: ~p~n", [StateName]),
+	%?log_debug("wait_till_st_unbound, StateName: ~p", [StateName]),
 	case StateName of
 		st_unbound ->
 			{reply, {ok, unbound}, StateName, StateData};
@@ -103,14 +104,14 @@ handle_info({tcp, _, TcpData}, StateName, StateData = #state{
 	sock = Sock, tcp_bytes_part = BytesPart
 }) ->
 	try
-		% io:format("Data for parsing: ~p~n", [list_to_binary([BytesPart, TcpData])]),
+		%?log_debug("Data for parsing: ~p", [list_to_binary([BytesPart, TcpData])]),
 		{ok, NewBytesPart} = parse_tcp_data(list_to_binary([BytesPart, TcpData])),
-		% io:format("NewBytesPart: ~p~n", [NewBytesPart]),
+		%?log_debug("NewBytesPart: ~p", [NewBytesPart]),
 		inet:setopts(Sock, [{active, once}]),
 		{next_state, StateName, StateData#state{tcp_bytes_part = NewBytesPart}}
 	catch
 		EType:Error ->
-			io:format("Error parsing data: ~p:~p~n", [EType, Error]),
+			?log_debug("Error parsing data: ~p:~p", [EType, Error]),
 			Bye = #billy_session_bye{
 				state_name = StateName,
 				reason = internal_error,
@@ -215,7 +216,7 @@ st_unbound(Event, _From, StateData) ->
 st_binding({in_pdu, BindResponse = #billy_session_bind_response{
 	result = accept
 }}, StateData = #state{args = Args, bound_request = Caller}) ->
-	% io:format("in_pdu, BindResponse", []),
+	%?log_debug("in_pdu, BindResponse", []),
 	?dispatch_event(cb_on_bind_accept, Args, self(), BindResponse),
 	case Caller of
 		undefined ->
@@ -343,13 +344,13 @@ send_pdu(Sock, Msg, Data) ->
 	send_pdu(Sock, PDU).
 
 send_pdu(Sock, PDU) ->
-	% io:format("Sending PDU:~p into ~p~n", [PDU, Sock]),
+	%?log_debug("Sending PDU:~p into ~p", [PDU, Sock]),
 	PDUBin = billy_session_piqi:gen_pdu(PDU),
 	Size = size(list_to_binary(PDUBin)),
 	BinSize = <<Size:16/little>>,
-	% io:format("BinSize: ~p~n", [BinSize]),
+	%?log_debug("BinSize: ~p", [BinSize]),
 	Bin = list_to_binary([BinSize, PDUBin]),
-	% io:format("Sending BIN: ~p~n", [Bin]),
+	%?log_debug("Sending BIN: ~p", [Bin]),
 	gen_tcp:send(Sock, Bin),
 	inet:setopts(Sock, [{active, once}]).
 
@@ -362,7 +363,7 @@ parse_tcp_data(<<BinSize:2/binary, BytesSoFar/binary>>) ->
 		BytesSoFarSize >= Size ->
 			<<PDUBin:Size/binary, PDUBinSoFar/binary>> = BytesSoFar,
 			{_PDUType, PDU} = billy_session_piqi:parse_pdu(PDUBin),
-			%io:format("Got ~p on ~p~n", [PDU, Sock]),
+			%?log_debug("Got ~p on ~p", [PDU, Sock]),
 			gen_fsm:send_event(self(), {in_pdu, PDU}),
 			parse_tcp_data(PDUBinSoFar);
 		true ->

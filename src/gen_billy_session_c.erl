@@ -42,6 +42,7 @@ behaviour_info(callbacks) ->
 ].
 
 -include("billy_session_c.hrl").
+-include_lib("billy_common/include/logging.hrl").
 
 -record(state, {
 	ref :: reference(),
@@ -60,7 +61,7 @@ start_link(Sock, Mod, ModArgs) ->
 
 pass_socket_control(Session, Socket) ->
 	{ok, FSM} = gen_server:call(Session, get_fsm, infinity),
-	io:format("passing control over ~p to ~p~n", [Socket, FSM]),
+	?log_debug("passing control over ~p to ~p", [Socket, FSM]),
 	ok = gen_tcp:controlling_process(Socket, FSM),
 	inet:setopts(Socket, [{active, once}]).
 
