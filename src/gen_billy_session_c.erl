@@ -5,8 +5,6 @@
 %% API
 -export([
 	start_link/3,
-	pass_socket_control/2,
-
 	reply_bind/2,
 	reply_unbind/2,
 	reply_bye/2,
@@ -58,12 +56,6 @@ behaviour_info(callbacks) ->
 
 start_link(Sock, Mod, ModArgs) ->
 	gen_server:start_link(?MODULE, {Sock, Mod, ModArgs}, []).
-
-pass_socket_control(Session, Socket) ->
-	{ok, FSM} = gen_server:call(Session, get_fsm, infinity),
-	?log_debug("passing control over ~p to ~p", [Socket, FSM]),
-	ok = gen_tcp:controlling_process(Socket, FSM),
-	inet:setopts(Socket, [{active, once}]).
 
 reply_bye(Session, Props) ->
 	{ok, FSM} = gen_server:call(Session, get_fsm, infinity),
