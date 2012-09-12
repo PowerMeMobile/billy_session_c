@@ -149,6 +149,7 @@ st_negotiating({in_pdu, Hello = #billy_session_hello{
 		From ->
 			gen_fsm:reply(From, {ok, unbound})
 	end,
+	?log_debug("negotiation => unbound", []),
 	{next_state, st_unbound, StateData#state{
 		session_id = SessionID
 	}};
@@ -181,6 +182,7 @@ st_unbound({control, bind, BindProps}, StateData = #state{sock = Sock}) ->
 		client_pw = ClientPw
 	},
 	send_pdu(Sock, bind_request, BindReq),
+	?log_debug("unbound => binding", []),
 	{next_state, st_binding, StateData};
 
 % API asked to say #bye
@@ -222,6 +224,7 @@ st_binding({in_pdu, BindResponse = #billy_session_bind_response{
 		From ->
 			gen_fsm:reply(From, {ok, bound})
 	end,
+	?log_debug("binding => bound", []),
 	{next_state, st_bound, StateData};
 
 st_binding({in_pdu, BindResponse = #billy_session_bind_response{
@@ -265,12 +268,14 @@ st_bound({control, unbind, UnbindProps}, StateData = #state{sock = Sock}) ->
 		reason = proplists:get_value(reason, UnbindProps)
 	},
 	send_pdu(Sock, unbind_request, UnbindRequest),
+	?log_debug("bound => unbinding", []),
 	{next_state, st_unbinding, StateData};
 
 st_bound({in_pdu, RequireUnbind = #billy_session_require_unbind{}}, StateData = #state{
 	args = Args
 }) ->
 	?dispatch_event(cb_on_required_unbind, Args, self(), RequireUnbind),
+	?log_debug("bound => required_unbind", []),
 	{next_state, st_required_unbind, StateData};
 
 % got unexpected PDU: saying #bye{reason = protocol_error}
@@ -321,6 +326,7 @@ st_unbinding({in_pdu, UnbindResponse = #billy_session_unbind_response{}}, StateD
 		From ->
 			gen_fsm:reply(From, {ok, unbound})
 	end,
+	?log_debug("unbinding => unbound", []),
 	{next_state, st_unbound, StateData};
 
 % got unexpected PDU: saying #bye{reason = protocol_error}
