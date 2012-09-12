@@ -81,22 +81,24 @@ init({Sock, Args}) ->
 handle_event(Event, _StateName, StateData) ->
 	{stop, {bad_arg, Event}, StateData}.
 
-handle_sync_event(wait_till_st_bound, From, StateName, StateData) ->
-	%?log_debug("wait_till_st_bound, StateName: ~p", [StateName]),
+handle_sync_event(wait_until_st_bound, From, StateName, StateData) ->
+	%?log_debug("wait_until_st_bound, state: ~p", [StateName]),
 	case StateName of
 		st_bound ->
 			{reply, {ok, bound}, StateName, StateData};
 		_Any ->
 			{next_state, StateName, StateData#state{bound_request = From}}
 	end;
-handle_sync_event(wait_till_st_unbound, From, StateName, StateData) ->
-	%?log_debug("wait_till_st_unbound, StateName: ~p", [StateName]),
+
+handle_sync_event(wait_until_st_unbound, From, StateName, StateData) ->
+	%?log_debug("wait_until_st_unbound, state: ~p", [StateName]),
 	case StateName of
 		st_unbound ->
 			{reply, {ok, unbound}, StateName, StateData};
 		_Any ->
 			{next_state, StateName, StateData#state{unbound_request = From}}
 	end;
+
 handle_sync_event(Event, _From, _StateName, StateData) ->
 	{stop, {bad_arg, Event}, bad_arg, StateData}.
 
@@ -314,9 +316,15 @@ st_required_unbind(Event, _From, StateData) ->
 %% ===================================================================
 
 st_unbinding({in_pdu, UnbindResponse = #billy_session_unbind_response{}}, StateData = #state{
-	args = Args
+	args = Args, unbound_request = Caller
 }) ->
 	?dispatch_event(cb_on_unbound, Args, self(), UnbindResponse),
+	case Caller of
+		undefined ->
+			ok;
+		From ->
+			gen_fsm:reply(From, {ok, unbound})
+	end,
 	{next_state, st_unbound, StateData};
 
 % got unexpected PDU: saying #bye{reason = protocol_error}
