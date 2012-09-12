@@ -123,9 +123,7 @@ handle_info({tcp, _, TcpData}, StateName, StateData = #state{
 			{stop, normal, StateData}
 	end;
 
-handle_info({tcp_closed, _}, _StateName, StateData = #state{
-	sock = _Sock
-}) ->
+handle_info({tcp_closed, _}, _StateName, StateData = #state{sock = _Sock}) ->
 	{stop, lost_connection, StateData};
 
 handle_info(Info, _StateName, StateData) ->
@@ -186,9 +184,7 @@ st_unbound({control, bind, BindProps}, StateData = #state{sock = Sock}) ->
 	{next_state, st_binding, StateData};
 
 % API asked to say #bye
-st_unbound({control, bye}, StateData = #state{
-	sock = Sock
-}) ->
+st_unbound({control, bye, _ByeProps}, StateData = #state{sock = Sock}) ->
 	Bye = #billy_session_bye{
 		state_name = st_unbound,
 		reason = normal
