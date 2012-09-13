@@ -4,7 +4,7 @@
 
 %% API
 -export([
-	start_link/2
+	start_link/3
 ]).
 
 %% gen_fsm callbacks
@@ -60,14 +60,18 @@
 %% API
 %% ===================================================================
 
-start_link(Sock, Args = #?ARGS{}) ->
-	gen_fsm:start_link(?MODULE, {Sock, Args}, []).
+start_link(Host, Port, Args = #?ARGS{}) ->
+	gen_fsm:start_link(?MODULE, [Host, Port, Args], []).
 
 %% ===================================================================
 %% gen_fsm callbacks
 %% ===================================================================
 
-init({Sock, Args}) ->
+init([Host, Port, Args]) ->
+	{ok, Sock} = gen_tcp:connect(Host, Port, [binary, {active, false}]),
+	%ok = gen_tcp:controlling_process(Sock, FSM),
+	inet:setopts(Sock, [{active, once}]),
+
 	gproc:add_local_name({?MODULE, Sock}),
 	?log_debug("FSM_C:init ~p", [self()]),
 
