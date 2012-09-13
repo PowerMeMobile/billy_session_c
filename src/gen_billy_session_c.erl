@@ -4,7 +4,7 @@
 
 %% API
 -export([
-	start_link/3,
+	start_link/2,
 	reply_bind/2,
 	reply_unbind/2,
 	reply_bye/2,
@@ -26,7 +26,7 @@
 ]).
 behaviour_info(callbacks) ->
 	[
-		{init, 2},
+		{init, 1},
 		{handle_call, 4},
 		{handle_cast, 3},
 
@@ -54,34 +54,30 @@ behaviour_info(callbacks) ->
 %% API
 %% ===================================================================
 
-start_link(Sock, Mod, ModArgs) ->
-	gen_server:start_link(?MODULE, {Sock, Mod, ModArgs}, []).
+start_link(Mod, ModArgs) ->
+	gen_server:start_link(?MODULE, [Mod, ModArgs], []).
 
-reply_bye(Session, Props) ->
-	{ok, FSM} = gen_server:call(Session, get_fsm, infinity),
+reply_bye(FSM, Props) ->
 	gen_fsm:send_event(FSM, {control, bye, Props}).
 
-reply_bind(Session, Props) ->
-	{ok, FSM} = gen_server:call(Session, get_fsm, infinity),
+reply_bind(FSM, Props) ->
 	gen_fsm:send_event(FSM, {control, bind, Props}).
 
-reply_unbind(Session, Props) ->
-	{ok, FSM} = gen_server:call(Session, get_fsm, infinity),
+reply_unbind(FSM, Props) ->
 	gen_fsm:send_event(FSM, {control, unbind, Props}).
 
-reply_data_pdu(Session, Props) ->
-	{ok, FSM} = gen_server:call(Session, get_fsm, infinity),
+reply_data_pdu(FSM, Props) ->
 	gen_fsm:send_event(FSM, {control, data_pdu, Props}).
 
 %% ===================================================================
 %% gen_server callbacks
 %% ===================================================================
 
-init({Sock, Mod, ModArgs}) ->
+init([Mod, [Host, Port | ModArgs]]) ->
 	Gen = self(),
 	Ref = make_ref(),
 
-	{ok, FSM} = billy_session_c_fsm:start_link(Sock, #billy_session_c_args{
+	{ok, FSM} = billy_session_c_fsm:start_link(Host, Port, #billy_session_c_args{
 		cb_on_hello = fun(_Pid, PDU) -> gen_server:cast(Gen, {Ref, on_hello, PDU}) end,
 		cb_on_bind_accept = fun(_Pid, PDU) -> gen_server:cast(Gen, {Ref, on_bind_accept, PDU}) end,
 		cb_on_bind_reject = fun(_Pid, PDU) -> gen_server:cast(Gen, {Ref, on_bind_reject, PDU}) end,
@@ -91,7 +87,7 @@ init({Sock, Mod, ModArgs}) ->
 		cb_on_data_pdu = fun(_Pid, PDU) -> gen_server:cast(Gen, {Ref, on_data_pdu, PDU}) end
 	}),
 
-	{ok, ModState} = Mod:init(ModArgs, FSM),
+	{ok, ModState} = Mod:init(ModArgs),
 
 	{ok, #state{
 		ref = Ref,
