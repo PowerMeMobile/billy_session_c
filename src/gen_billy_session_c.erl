@@ -4,7 +4,7 @@
 
 %% API
 -export([
-	start_link/2,
+	start_link/3,
 	reply_bind/2,
 	reply_unbind/2,
 	reply_bye/2,
@@ -54,8 +54,8 @@ behaviour_info(callbacks) ->
 %% API
 %% ===================================================================
 
-start_link(Mod, ModArgs) ->
-	gen_server:start_link(?MODULE, [Mod, ModArgs], []).
+start_link(Socket, Mod, ModArgs) ->
+	gen_server:start_link(?MODULE, [Socket, Mod, ModArgs], []).
 
 reply_bye(FSM, Props) ->
 	gen_fsm:send_event(FSM, {control, bye, Props}).
@@ -73,11 +73,11 @@ reply_data_pdu(FSM, Props) ->
 %% gen_server callbacks
 %% ===================================================================
 
-init([Mod, [Host, Port | ModArgs]]) ->
+init([Socket, Mod, ModArgs]) ->
 	Gen = self(),
 	Ref = make_ref(),
 
-	{ok, FSM} = billy_session_c_fsm:start_link(Host, Port, #billy_session_c_args{
+	{ok, FSM} = billy_session_c_fsm:start_link(Socket, #billy_session_c_args{
 		cb_on_hello = fun(_Pid, PDU) -> gen_server:cast(Gen, {Ref, on_hello, PDU}) end,
 		cb_on_bind_accept = fun(_Pid, PDU) -> gen_server:cast(Gen, {Ref, on_bind_accept, PDU}) end,
 		cb_on_bind_reject = fun(_Pid, PDU) -> gen_server:cast(Gen, {Ref, on_bind_reject, PDU}) end,
