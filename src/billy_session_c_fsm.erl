@@ -192,6 +192,7 @@ st_unbound({control, bye, _ByeProps}, StateData = #state{sock = Sock}) ->
 		reason = normal
 	},
 	send_pdu(Sock, bye, Bye),
+	?log_debug("unbound => stop (normal)", []),
 	{stop, normal, StateData};
 
 % got unexpected PDU: saying #bye{reason = protocol_error}
@@ -201,6 +202,7 @@ st_unbound({in_pdu, _WrongPDU}, StateData = #state{sock = Sock}) ->
 		reason = protocol_error
 	},
 	send_pdu(Sock, bye, Bye),
+	?log_debug("unbound => stop (protocol_error)", []),
 	{stop, protocol_error, StateData};
 
 st_unbound(Event, StateData) ->
@@ -231,6 +233,7 @@ st_binding({in_pdu, BindResponse = #billy_session_bind_response{
 	result = {reject, _}
 }}, StateData = #state{args = Args}) ->
 	?dispatch_event(cb_on_bind_reject, Args, self(), BindResponse),
+	?log_debug("binding => unbound", []),
 	{next_state, st_unbound, StateData};
 
 % got unexpected PDU: saying #bye{reason = protocol_error}
@@ -240,6 +243,7 @@ st_binding({in_pdu, _WrongPDU}, StateData = #state{sock = Sock}) ->
 		reason = protocol_error
 	},
 	send_pdu(Sock, bye, Bye),
+	?log_debug("binding => stop (protocol_error)", []),
 	{stop, protocol_error, StateData};
 
 st_binding(Event, StateData) ->
@@ -285,6 +289,7 @@ st_bound({in_pdu, _WrongPDU}, StateData = #state{sock = Sock}) ->
 		reason = protocol_error
 	},
 	send_pdu(Sock, bye, Bye),
+	?log_debug("bound => stop (protocol_error)", []),
 	{stop, protocol_error, StateData};
 
 st_bound(Event, StateData) ->
@@ -304,6 +309,7 @@ st_required_unbind({in_pdu, _WrongPDU}, StateData = #state{sock = Sock}) ->
 		reason = protocol_error
 	},
 	send_pdu(Sock, bye, Bye),
+	?log_debug("required_unbind => stop (protocol_error)", []),
 	{stop, protocol_error, StateData};
 
 st_required_unbind(Event, StateData) ->
@@ -336,6 +342,7 @@ st_unbinding({in_pdu, _WrongPDU}, StateData = #state{sock = Sock}) ->
 		reason = protocol_error
 	},
 	send_pdu(Sock, bye, Bye),
+	?log_debug("unbinding => stop (protocol_error)", []),
 	{stop, protocol_error, StateData};
 
 st_unbinding(Event, StateData) ->
