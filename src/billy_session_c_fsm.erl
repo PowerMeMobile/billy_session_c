@@ -140,7 +140,7 @@ terminate(_Reason, _StateName, _StateData) ->
 %% ===================================================================
 
 st_negotiating({in_pdu, Hello = #billy_session_hello{
-	session_id = SessionID
+	session_id = SessionId
 }}, StateData = #state{args = Args, unbound_request = Caller}) ->
 	?dispatch_event(cb_on_hello, Args, self(), Hello) ,
 	case Caller of
@@ -151,7 +151,7 @@ st_negotiating({in_pdu, Hello = #billy_session_hello{
 	end,
 	?log_debug("negotiation => unbound", []),
 	{next_state, st_unbound, StateData#state{
-		session_id = SessionID
+		session_id = SessionId
 	}};
 
 % got unexpected PDU: saying #bye{reason = protocol_error}
