@@ -29,6 +29,7 @@ behaviour_info(callbacks) ->
 		{init, 1},
 		{handle_call, 4},
 		{handle_cast, 3},
+		{terminate, 3},
 
 		{handle_hello, 3},
 		{handle_bind_accept, 3},
@@ -77,7 +78,7 @@ init([Socket, Mod, ModArgs]) ->
 	Gen = self(),
 	Ref = make_ref(),
 
-	{ok, FSM} = billy_session_c_fsm:start_link(Socket, #billy_session_c_args{
+	{ok, FSM} = billy_session_c_fsm:start(Socket, #billy_session_c_args{
 		cb_on_hello = fun(_Pid, PDU) -> gen_server:cast(Gen, {Ref, on_hello, PDU}) end,
 		cb_on_bind_accept = fun(_Pid, PDU) -> gen_server:cast(Gen, {Ref, on_bind_accept, PDU}) end,
 		cb_on_bind_reject = fun(_Pid, PDU) -> gen_server:cast(Gen, {Ref, on_bind_reject, PDU}) end,
@@ -86,6 +87,7 @@ init([Socket, Mod, ModArgs]) ->
 		cb_on_bye = fun(_Pid, PDU) -> gen_server:cast(Gen, {Ref, on_bye, PDU}) end,
 		cb_on_data_pdu = fun(_Pid, PDU) -> gen_server:cast(Gen, {Ref, on_data_pdu, PDU}) end
 	}),
+	erlang:monitor(process, FSM),
 
 	{ok, ModState} = Mod:init(ModArgs),
 
@@ -179,11 +181,14 @@ handle_cast(Request, State = #state{fsm = FSM, mod_state = ModState, mod = Mod})
 			{stop, Reason, State#state{mod_state = NewMState}}
 	end.
 
+handle_info({'DOWN', _MonitorRef, process, FSM, Reason}, State = #state{fsm = SM}) ->
+	{stop, Reason, State};
+
 handle_info(Message, State = #state{}) ->
 	{stop, {bad_arg, Message}, State}.
 
-terminate(_Reason, _State) ->
-	ok.
+terminate(Reason, State = #state{fsm = FSM, mod_state = ModState, mod = Mod}) ->
+	ok = Mod:terminate(Reason, FSM, ModState).
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.

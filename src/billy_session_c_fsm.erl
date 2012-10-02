@@ -4,7 +4,7 @@
 
 %% API
 -export([
-	start_link/2
+	start/2
 ]).
 
 %% gen_fsm callbacks
@@ -60,8 +60,8 @@
 %% API
 %% ===================================================================
 
-start_link(Sock, Args = #?ARGS{}) ->
-	gen_fsm:start_link(?MODULE, [Sock, Args], []).
+start(Sock, Args = #?ARGS{}) ->
+	gen_fsm:start(?MODULE, [Sock, Args], []).
 
 %% ===================================================================
 %% gen_fsm callbacks
@@ -120,7 +120,7 @@ handle_info({tcp, _, TcpData}, StateName, StateData = #state{
 				reason_long = list_to_binary(io_lib:format("~p : ~p", [EType, Error]))
 			},
 			send_pdu(Sock, bye, Bye),
-			{stop, normal, StateData}
+			{stop, internal_error, StateData}
 	end;
 
 handle_info({tcp_closed, _}, _StateName, StateData = #state{sock = _Sock}) ->
