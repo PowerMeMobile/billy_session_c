@@ -175,11 +175,9 @@ st_negotiating(Event, _From, StateData) ->
 
 % API asked to send #bind_request
 st_unbound({control, bind, BindProps}, StateData = #state{sock = Sock}) ->
-	ClientType = proplists:get_value(client_type, BindProps),
 	ClientID = proplists:get_value(client_id, BindProps),
 	ClientPw = proplists:get_value(client_pw, BindProps),
 	BindReq = #billy_session_bind_request{
-		client_type = ClientType,
 		client_id = ClientID,
 		client_pw = ClientPw
 	},
