@@ -7,6 +7,5 @@
 		stdlib,
 		billy_common
 	]},
-	{mod, {billy_session_c_app, []}},
 	{env, []}
 ]}.
