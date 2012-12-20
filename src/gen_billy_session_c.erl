@@ -24,6 +24,9 @@
 -export([
 	behaviour_info/1
 ]).
+
+-spec behaviour_info(callbacks) -> [{atom(), arity()}];
+					(any()) -> undefined.
 behaviour_info(callbacks) ->
 	[
 		{init, 1},
@@ -38,16 +41,18 @@ behaviour_info(callbacks) ->
 		{handle_unbind_response, 3},
 		{handle_bye, 3},
 		{handle_data_pdu, 3}
-].
+	];
+behaviour_info(_) ->
+	undefined.
 
 -include("billy_session_c.hrl").
+-include_lib("billy_common/include/gen_server_spec.hrl").
 -include_lib("billy_common/include/logging.hrl").
 
 -record(state, {
 	ref :: reference(),
 	mod :: term(),
 	mod_state :: any(),
-
 	fsm :: pid()
 }).
 
