@@ -1,13 +1,12 @@
-{application, billy_session_c,
- [
-  {description, "Billy session protocol FSM api (Client side)"},
-  {vsn, "0.1.0"},
-  {registered, []},
-  {applications, [
-                  kernel,
-                  stdlib,
-                  billy_common
-                 ]},
-  {mod, {billy_session_c_app, []}},
-  {env, []}
- ]}.
+{application, billy_session_c, [
+	{description, "Billy session protocol FSM api (Client side)"},
+	{vsn, "0.1.0"},
+	{registered, []},
+	{applications, [
+		kernel,
+		stdlib,
+		billy_common
+	]},
+	{mod, {billy_session_c_app, []}},
+	{env, []}
+]}.

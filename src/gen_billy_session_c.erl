@@ -181,13 +181,13 @@ handle_cast(Request, State = #state{fsm = FSM, mod_state = ModState, mod = Mod})
 			{stop, Reason, State#state{mod_state = NewMState}}
 	end.
 
-handle_info({'DOWN', _MonitorRef, process, FSM, Reason}, State = #state{fsm = SM}) ->
+handle_info({'DOWN', _MonitorRef, process, _FSM, Reason}, State = #state{}) ->
 	{stop, Reason, State};
 
 handle_info(Message, State = #state{}) ->
 	{stop, {bad_arg, Message}, State}.
 
-terminate(Reason, State = #state{fsm = FSM, mod_state = ModState, mod = Mod}) ->
+terminate(Reason, #state{fsm = FSM, mod_state = ModState, mod = Mod}) ->
 	ok = Mod:terminate(Reason, FSM, ModState).
 
 code_change(_OldVsn, State, _Extra) ->
