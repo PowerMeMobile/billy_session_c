@@ -38,7 +38,7 @@
 -include("billy_session_c.hrl").
 -include_lib("billy_common/include/logging.hrl").
 -include_lib("billy_common/include/billy_session_piqi.hrl").
--include_lib("billy_common/include/gen_fsm_spec.hrl").
+-include_lib("alley_common/include/gen_fsm_spec.hrl").
 
 -define(ARGS, billy_session_c_args).
 

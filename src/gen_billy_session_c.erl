@@ -46,7 +46,7 @@ behaviour_info(_) ->
 	undefined.
 
 -include("billy_session_c.hrl").
--include_lib("billy_common/include/gen_server_spec.hrl").
+-include_lib("alley_common/include/gen_server_spec.hrl").
 -include_lib("billy_common/include/logging.hrl").
 
 -record(state, {
